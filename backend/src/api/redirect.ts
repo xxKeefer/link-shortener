@@ -1,11 +1,11 @@
 import express from 'express'
 import { Request } from 'express'
-import { DBConnection } from '../db/types'
 import { shortenLinkTable as links } from '../db/schema'
 import { eq } from 'drizzle-orm'
+import { db as DBConnection } from '../db'
 
 // Router --------------------------
-export default function shortenRouter(db: DBConnection) {
+export default function shortenRouter(db: typeof DBConnection) {
   const router = express.Router()
 
   router.get('/:shortCode', async (req: Request<{ shortCode: string }>, res) => {

@@ -1,8 +1,8 @@
 import express from 'express'
 import { Request } from 'express'
-import { DBConnection } from '../db/types'
-import { shortenLinkTable as links } from '../db/schema'
-import { eq } from 'drizzle-orm'
+import { db as DBConnection } from '../db'
+import { shortenLinkTable as links, permissions, rolePermissions } from '../db/schema'
+import { eq, inArray } from 'drizzle-orm'
 
 //  Constants --------------------
 const NUMERIC = '0123456789'
@@ -23,36 +23,65 @@ const padHash = (hash: string, length: number, charset: string): string =>
   hash.padStart(length, charset[0])
 
 // Router --------------------------
-export default function shortenRouter(db: DBConnection) {
+export default function shortenRouter(db: typeof DBConnection) {
   const router = express.Router()
 
   router.post('/', async (req: Request<{}, {}, { url: string }>, res) => {
+    if (!req.user) return res.status(401).json({ error: 'unauthorized' })
     const offset = await db.$count(links)
     const raw = toBaseN(offset, CHARSET)
     const hash = padHash(raw, HASH_LENGTH, CHARSET)
 
-    const result = await db.insert(links).values({ shortCode: hash, url: req.body.url }).returning()
+    const result = await db
+      .insert(links)
+      .values({ shortCode: hash, url: req.body.url, createdBy: req.user.id })
+      .returning()
     return res.status(201).json(result[0])
   })
 
   router.get('/:shortCode/stats', async (req: Request<{ shortCode: string }>, res) => {
+    if (!req.user) return res.status(401).json({ error: 'unauthorized' })
     const result = await db.select().from(links).where(eq(links.shortCode, req.params.shortCode))
 
     if (result.length === 0) return res.status(404).json({ error: 'shortCode not found' })
+    const [link] = result
+    const allowed = (
+      await db.select().from(rolePermissions).where(eq(rolePermissions.roleId, req.user.role))
+    ).map((x) => x.permissionId)
+    const perms = (await db.select().from(permissions).where(inArray(permissions.id, allowed))).map(
+      (x) => x.action
+    )
+
+    if (!perms.includes('link:read') && link.createdBy !== req.user.id)
+      return res.status(401).json({ error: 'unauthorized' })
 
     return res.status(200).json(result[0])
   })
 
   router.delete('/:shortCode', async (req: Request<{ shortCode: string }>, res) => {
-    const result = await db
+    if (!req.user) return res.status(401).json({ error: 'unauthorized' })
+
+    const result = await db.select().from(links).where(eq(links.shortCode, req.params.shortCode))
+
+    if (result.length === 0) return res.status(404).json({ error: 'shortCode not found' })
+    const [link] = result
+    const allowed = (
+      await db.select().from(rolePermissions).where(eq(rolePermissions.roleId, req.user.role))
+    ).map((x) => x.permissionId)
+    const perms = (await db.select().from(permissions).where(inArray(permissions.id, allowed))).map(
+      (x) => x.action
+    )
+
+    if (!perms.includes('link:archive') && link.createdBy !== req.user.id)
+      return res.status(401).json({ error: 'unauthorized' })
+
+    const [archived] = await db
       .update(links)
       .set({ archived: true })
       .where(eq(links.shortCode, req.params.shortCode))
       .returning()
 
-    if (result.length === 0) return res.status(404).json({ error: 'shortCode not found' })
-
-    return res.status(204).json(result[0])
+    return res.status(204).json(archived)
   })
 
   return router
