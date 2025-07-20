@@ -1,29 +1,14 @@
 {
-  "name": "link-shortener",
+  "name": "link-shortener-monorepo",
+  "private": true,
   "version": "1.0.0",
-  "description": "",
-  "main": "main.ts",
-  "scripts": {
-    "dev": "npx tsx src/main.ts",
-    "build": "npx tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "packageManager": "pnpm@10.11.0",
-  "dependencies": {
-    "dotenv": "^17.1.0",
-    "drizzle-orm": "^0.44.2",
-    "express": "^5.1.0",
-    "postgres": "^3.4.7"
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test"
   },
   "devDependencies": {
-    "@tsconfig/node23": "^23.0.2",
-    "@types/express": "^5.0.3",
-    "@types/node": "^24.0.12",
-    "drizzle-kit": "^0.31.4",
-    "tsx": "^4.20.3",
-    "typescript": "^5.8.3"
+    "turbo": "^2.5.5"
   }
 }
